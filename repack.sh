@@ -21,17 +21,31 @@ OUT=${3:-app}
 
 echo "repacking $SMALI into $OUT.apk in directory $DIR"
 
-smali assemble $DIR/$SMALI -o $DIR/classes.dex
+tmpdir=$(mktemp -d -t repacker-XXXXXXXXXX)
 
-cd $DIR
-zip -r $OUT.tmp.apk AndroidManifest.xml $DIR/classes.dex $DIR/res/ resources.arsc
-cd -
+echo -ne "[ ] smali\r"
+smali assemble $DIR/$SMALI -o $tmpdir/classes.dex  > /dev/null
+echo "[x] smali"
 
+echo -ne "[ ] zip\r"
+cp -r $DIR/AndroidManifest.xml $DIR/res $DIR/resources.arsc $tmpdir/
+cd $tmpdir
+zip -r $DIR/$OUT.tmp.apk AndroidManifest.xml classes.dex res/ resources.arsc > /dev/null
+cd - > /dev/null
+echo "[x] zip"
+
+echo -ne "[ ] sign apk\r"
 java -jar signapk/signapk.jar signapk/certificate.pem signapk/key.pk8 $DIR/$OUT.tmp.apk $DIR/$OUT.signed.apk
+echo "[x] sign apk"
 
+echo -ne "[ ] zip align\r"
 zipalign -a 4 -i $DIR/$OUT.signed.apk -o $DIR/$OUT.apk
+echo "[x] zip align"
 
+echo -ne "[ ] cleanup\r"
 rm $DIR/$OUT.tmp.apk
 rm $DIR/$OUT.signed.apk
+echo "[x] cleanup"
 
 echo "Done!"
+echo "Result at $OUT.apk"
